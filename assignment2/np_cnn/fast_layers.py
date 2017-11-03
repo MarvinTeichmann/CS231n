@@ -30,10 +30,43 @@ def conv_forward_fast(x, w, b, conv_param):
     # Create output
     out_height = (H + 2 * pad - filter_height) // stride + 1
     out_width = (W + 2 * pad - filter_width) // stride + 1
+
     out = np.zeros((N, num_filters, out_height, out_width), dtype=x.dtype)
 
     x_cols = im2col_indices(x, w.shape[2], w.shape[3], pad, stride)
+
     # x_cols = im2col_cython(x, w.shape[2], w.shape[3], pad, stride)
+    res = w.reshape((w.shape[0], -1)).dot(x_cols) + b.reshape(-1, 1)
+
+    out = res.reshape(w.shape[0], out.shape[2], out.shape[3], x.shape[0])
+    out = out.transpose(3, 0, 1, 2)
+
+    cache = (x, w, b, conv_param, x_cols)
+    return out, cache
+
+
+def conv_forward_cython(x, w, b, conv_param):
+    """
+    A fast implementation of the forward pass for a convolutional layer
+    based on im2col and col2im.
+    """
+    N, C, H, W = x.shape
+    num_filters, _, filter_height, filter_width = w.shape
+    stride, pad = conv_param['stride'], conv_param['pad']
+
+    # Check dimensions
+    assert (W + 2 * pad - filter_width) % stride == 0, 'width does not work'
+    assert (H + 2 * pad - filter_height) % stride == 0, 'height does not work'
+
+    # Create output
+    out_height = (H + 2 * pad - filter_height) // stride + 1
+    out_width = (W + 2 * pad - filter_width) // stride + 1
+
+    out = np.zeros((N, num_filters, out_height, out_width), dtype=x.dtype)
+
+    # x_cols = im2col_indices(x, w.shape[2], w.shape[3], pad, stride)
+
+    x_cols = im2col_cython(x, w.shape[2], w.shape[3], pad, stride)
     res = w.reshape((w.shape[0], -1)).dot(x_cols) + b.reshape(-1, 1)
 
     out = res.reshape(w.shape[0], out.shape[2], out.shape[3], x.shape[0])
